@@ -53,16 +53,20 @@ ENV UV_LINK_MODE=copy \
 # ------------------------------------------
 # 4. 关键：注入 Docker 权限自适应脚本 (S6 机制)
 # ------------------------------------------
-# 这一步确保你挂载 /var/run/docker.sock 后，code-server 用户能直接用 docker
-RUN echo '#!/bin/bash\n\
-if [ -S /var/run/docker.sock ]; then\n\
-    DOCKER_GID=$(stat -c %g /var/run/docker.sock)\n\
-    # 如果组已存在则不报错，否则创建\n\
-    groupadd -g $DOCKER_GID docker-host || true\n\
-    # 将 abc (LSIO 默认用户) 加入该组\n\
-    usermod -aG $DOCKER_GID abc\n\
-fi' > /etc/cont-init.d/99-docker-permissions && \
-    chmod +x /etc/cont-init.d/99-docker-permissions
+# 使用 COPY <<EOF 语法，不需要手动处理 \n 和引号转义
+COPY <<'EOF' /etc/cont-init.d/99-docker-permissions
+#!/bin/bash
+if [ -S /var/run/docker.sock ]; then
+    DOCKER_GID=$(stat -c %g /var/run/docker.sock)
+    # 如果组已存在则不报错，否则创建
+    groupadd -g $DOCKER_GID docker-host || true
+    # 将 abc (LSIO 默认用户) 加入该组
+    usermod -aG $DOCKER_GID abc
+fi
+EOF
+
+# 赋予执行权限
+RUN chmod +x /etc/cont-init.d/99-docker-permissions
 
 # ------------------------------------------
 # 5. 用户环境配置 (可选)
